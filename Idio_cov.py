@@ -1,4 +1,5 @@
 '''
+@author：Yiwen Pan
 特质股票收益率协方差调整：
 Newey-West Adjustment
 Structural Model Adjustment
@@ -24,7 +25,8 @@ u = u.T # index是日期，columns是stock
 
 def var_weighted(self, d=0):
     '''
-    计算指数加权方差，滞后期delay的指数加权方差
+    计算指数加权方差
+    d：滞后期delay的指数加权方差
     return返回指数加权方差 Series
     '''
     weighted_var = pd.DataFrame(columns = self.columns)
@@ -47,6 +49,11 @@ def var_weighted(self, d=0):
         return weighted_var
 
 def Newey_West(self,delay=2,NW=0):
+    '''
+    进行Newey-West调整，将日频数据转换成月频
+    delay：滞后期
+    NW：是否进行Newey-West调整
+    '''
     var_init = var_weighted(self, d=0)
     if NW:
         for i in range(1, 1+delay):
@@ -55,10 +62,10 @@ def Newey_West(self,delay=2,NW=0):
     var_TS = 21 * var_init
     return pd.Series(np.array(var_TS)[0], index = var_TS.columns)
 
-def Structure_Adjust(self, t):
+def Structural_Adjust(self, t):
     '''
     将特质波动率按照gamma进行结构化调整
-    t: 天数
+    t: 第t日
     '''
     var_TS = Newey_West(self, NW=1) # 进行Newey-West调整
     # 计算gamma_n
@@ -79,7 +86,7 @@ def Structure_Adjust(self, t):
     OLS_result = sm.OLS(y, X_adjust).fit()
     coeff = OLS_result.params
     # residue = y.values - X_adjust.dot(coeff).values # 残差
-    E_0 = 1 # E0：用于消除回归残差的指数项影响，约等于1
+    E_0 = 1 # 用于消除回归残差的指数项影响，约等于1
     var_STR = E_0 * np.exp(X.loc[gamma_n.index,:].dot(coeff))
     # var_STR2 = np.exp(X.loc[gamma_n.index,:].dot(coeff)+residue.mean())
     # print(var_STR2 / var_STR)
@@ -88,19 +95,16 @@ def Structure_Adjust(self, t):
 
 def Bayesian_Shrinkage(self, t, q=1):
     """
-    将特质波动率分10组进行贝叶斯收缩
+    将特质波动率分为十个组进行Bayesian Shrinkage
     t: 第t日的数据, string
     q：收缩参数，int
     return：返回贝叶斯收缩结果，series
     """
-    
-    # 所有股票gamma_n都取1, var_hat = var_TS
-    gamma_n = 1
-    var_hat = var_TS * gamma_n
+    var_hat = Structural_Adjust(self,t)
     var_hat = pd.DataFrame(var_hat, index = self.columns) # index是股票， columns是波动率
     var_hat['Code'] = var_hat.index
     var_hat.columns = ['Variance','Code'] 
-    # 按照市值大小排序
+    # 按照流通市值大小排序
     CAP_Series = pd.Series(index = var_hat.index, dtype='float64')
     for i in var_hat.index:
         CAP_Series[i] = np.exp(LNCAP_data.at[t,i])
@@ -140,8 +144,10 @@ def Volatility_Adjust(self, t, tau=42):
     var_VRA.columns = [t]
     return var_VRA
 
-
-length = 252
+'''
+时间窗口取252天
+'''
+length = 252 
 n_forward = 21
 tau = 90
 frequency = 21
@@ -150,16 +156,12 @@ for i in range(length, u.shape[0], frequency):
     tmp = u.iloc[i-length:i, :]
     tmp = tmp.dropna(axis = 1)
     t = u.index.tolist()[i-1] # 天数
-    u_i = Structure_Adjust(tmp, t)
-    
-    # u_i = Volatility_Adjust(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
-    # u_i = u_i.sort_index()
-    # u_i = u_i.squeeze()
-    # u_i = pd.DataFrame(np.diag(u_i), index = tmp.columns, columns = tmp.columns)
-    # print(u_i)
+    u_i = Volatility_Adjust(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
+    u_i = u_i.sort_index()
+    u_i = u_i.squeeze()
+    u_i = pd.DataFrame(np.diag(u_i), index = tmp.columns, columns = tmp.columns)
+    print(t)
+    print(u_i)
     # u_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/u_adjusted_cov_monthly',t+'.xlsx'))
     
-# print(u_cov)
-# u_cov.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_after_adjust_M.xlsx')
-
 

@@ -1,8 +1,10 @@
 '''
-已知现成的投资组合w（中证500 000905.SH）
+@author: Yiwen Pan
 计算各个因子所对应的收益和风险
 R_k = w*x*f_k
 sigma_k = (w * X * F_k) * X^T * w^T
+
+portfolio:中证500
 '''
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 from higgsboom.FuncUtils.DateTime import *
