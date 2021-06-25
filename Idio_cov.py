@@ -48,7 +48,7 @@ def var_weighted(self, d=0):
             weighted_var[i] = [np.sum((f1 - f.mean())*(f2 - f.mean())* w)/np.sum(w)]
         return weighted_var
 
-def Newey_West(self,delay=2,NW=0):
+def Newey_West_Adjusted(self,delay=2,NW=0):
     '''
     进行Newey-West调整，将日频数据转换成月频
     delay：滞后期
@@ -62,12 +62,12 @@ def Newey_West(self,delay=2,NW=0):
     var_TS = 21 * var_init
     return pd.Series(np.array(var_TS)[0], index = var_TS.columns)
 
-def Structural_Adjust(self, t):
+def Structural_Adjusted(self, t):
     '''
     将特质波动率按照gamma进行结构化调整
     t: 第t日
     '''
-    var_TS = Newey_West(self, NW=1) # 进行Newey-West调整
+    var_TS = Newey_West_Adjusted(self, NW=1) # 进行Newey-West调整
     # 计算gamma_n
     var_e = 1 / 1.35 * (self.quantile(0.75) - self.quantile(0.25)) # 个股n的稳健标准差
     self_adjust = self[(self > -10 * var_e) & (self < 10 * var_e)]
@@ -100,7 +100,7 @@ def Bayesian_Shrinkage(self, t, q=1):
     q：收缩参数，int
     return：返回贝叶斯收缩结果，series
     """
-    var_hat = Structural_Adjust(self,t)
+    var_hat = Structural_Adjusted(self,t)
     var_hat = pd.DataFrame(var_hat, index = self.columns) # index是股票， columns是波动率
     var_hat['Code'] = var_hat.index
     var_hat.columns = ['Variance','Code'] 
@@ -125,7 +125,7 @@ def Bayesian_Shrinkage(self, t, q=1):
     result.index = res['Code'].values
     return result
 
-def Volatility_Adjust(self, t, tau=42):
+def Volatility_Adjusted(self, t, tau=42):
     '''
     各个截面上的股票之间有一定相互的影响，进行Volatility的调整
     self: 特质收益率
@@ -156,12 +156,12 @@ for i in range(length, u.shape[0], frequency):
     tmp = u.iloc[i-length:i, :]
     tmp = tmp.dropna(axis = 1)
     t = u.index.tolist()[i-1] # 天数
-    u_i = Volatility_Adjust(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
+    u_i = Volatility_Adjusted(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
     u_i = u_i.sort_index()
     u_i = u_i.squeeze()
     u_i = pd.DataFrame(np.diag(u_i), index = tmp.columns, columns = tmp.columns)
     print(t)
     print(u_i)
-    # u_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/u_adjusted_cov_monthly',t+'.xlsx'))
+    u_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/u_adjusted_cov_monthly',t+'.xlsx'))
     
 

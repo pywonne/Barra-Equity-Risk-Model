@@ -1,6 +1,6 @@
 '''
 @author: Yiwen Pan
-计算各个因子所对应的收益和风险
+计算各个因子所对应的收益和风险贡献
 R_k = w*x*f_k
 sigma_k = (w * X * F_k) * X^T * w^T
 
@@ -14,8 +14,10 @@ import pandas as pd
 import os
 f_ret = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx', header=0, index_col=0)
 
-# 假设日期为 2021-02-09
 def Factor_Return_Risk(t):
+    '''
+    计算第t日的因子收益贡献和风险贡献
+    '''
     X = pd.read_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/X_daily',t+'.xlsx'), header=0, index_col=0)
     # print(X) # index是股票，columns是因子
     f = f_ret[t] # daily的f
@@ -52,7 +54,7 @@ def Factor_Return_Risk(t):
 
 PeriodList = TradingDays(startDate='2018-01-01', endDate='2021-04-09')
 for i in range(252, len(PeriodList)-21, 21):
-    t = PeriodList[i] # 月频
+    t = PeriodList[i-1] # 月频
     return_t, risk_t = Factor_Return_Risk(t)
     print('--------------------Factor Return--------------------')
     print(return_t)

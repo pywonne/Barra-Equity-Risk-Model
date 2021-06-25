@@ -1,10 +1,19 @@
+'''
+@author：Yiwen Pan
+因子收益率协方差调整：
+Newey-West Adjustment
+Eigenfactor Risk  Adjustment
+Volatility Regime Adjustment
+
+Portfolio：中证500
+'''
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 secUtils = CSecurityMarketDataUtils('Z:/StockData')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_v2.xlsx', header=0, index_col=0)
+f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx', header=0, index_col=0)
 # print(f)
 f = f.T # index是日期，columns是因子名称
 
@@ -49,13 +58,6 @@ def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,n_forward=21,NW=1):
     n_start：'n_start-length' to 'n_start' are used to get the covariance
     n_forward: the period ahead to calculate bias statistics B; std of r_ahead/risk_predicted
     '''
-    if n_start<length:
-        print('ERROR: n_start should be greater than length')
-        return
-    elif n_start+n_forward>=f.shape[0]:
-        print('ERROR: n_start + n_forward should be greater than No. of total frames')
-        return
-
     F = f.iloc[n_start-length:n_start,:]
     lambd = 0.5**(1./tau) # 指数权重
     if NW:
@@ -69,7 +71,7 @@ def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,n_forward=21,NW=1):
     R_eigen = np.dot(U0.T,r)
     Var_eigen = D0
     
-    if not np.allclose(F_NW,  U0.dot(np.diag(D0)).dot(U0.T)):
+    if not np.allclose(F_NW, U0.dot(np.diag(D0)).dot(U0.T)):
         print('ERROR in eigh')
         return
     
@@ -110,6 +112,7 @@ def v_fitting(v, a=1.4, n_start_fitting=16):
     p = np.poly1d(z)
     v_pk = np.array([p(xi) for xi in range(n_start_fitting)] + list(y))
     v_sk = a*(v_pk-1)+1
+
     return np.array(v_sk)
 
 def Volatility_Adjust(self, cov_Eigen, tau=42):
@@ -125,7 +128,7 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
     lambda_F = np.sqrt(np.sum(B_Ft ** 2 * w)/np.sum(w))
     lambda_F_all.append(lambda_F)
     
-    #对角线乘上lambda方
+    #对角线乘上lambda_F的平方
     cov_VRA = cov_Eigen.values
     dia_i = list(range(len(cov_VRA)))
     cov_VRA[dia_i,dia_i] = lambda_F ** 2 * cov_VRA[dia_i,dia_i]
@@ -138,12 +141,12 @@ tau = 90
 Bias = []
 v_all = []
 for i in range(length, f.shape[0]-n_forward, 21):
-    #---------------Newey-West Adjustment得出调整后日频协方差矩阵-----------------------------
+    #---------------Newey-West Adjustment得出调整后协方差矩阵-----------------------------
     F, U, F_NW_Adjusted, R_i, std_i = Newey_West_Adjusted(f, tau=tau,length=length, n_start=i, n_forward=n_forward, NW=1)
     # print(F_NW_Adjusted)
     # print(np.all(np.linalg.eigvals(F_NW_Adjusted) >= 0))
     Bias.append(R_i/std_i)
-    # # --------------Eigenfactor Adjustment每日做一次Monte Carlo Simulation-------------------
+    # --------------Eigenfactor Adjustment每日做一次Monte Carlo Simulation---------------
     vi = Eigen_Adjusted(F_NW_Adjusted, U, std_i, length=252,N_mc=1000)
     print(vi)
     v_all.append(vi)
@@ -192,17 +195,10 @@ for i in range(length, f.shape[0]-n_forward, 21):
     F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
   
     tmp = f.iloc[i-length:i,:]
-    t = f.index.tolist()[i] # 天数
+    t = f.index.tolist()[i-1] # 天数
     f_i = Volatility_Adjust(tmp, F_Eigen_Adjusted, tau=42)
 
     f_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/f_adjusted_cov_monthly',t+'.xlsx'))
-    # f_kt = f.iloc[i,:].values
-    # b_ = f_kt / np.sqrt(np.diag(F_Eigen_Adjusted))
-    # BF_t = np.sqrt(np.mean(b_ @ b_))
-    # BF_t_all.append(BF_t)
-    # b_vra = f_kt / np.sqrt(np.diag(f_i))
-    # BF_t_vra = np.sqrt(np.mean(b_vra @ b_vra))
-    # BF_t_vra_all.append(BF_t_vra)
    
 
         

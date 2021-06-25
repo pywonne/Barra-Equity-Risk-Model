@@ -1,3 +1,9 @@
+'''
+@author：Yiwen Pan
+计算daily因子收益率向量f和特质收益率向量u
+
+portfolio：中证500
+'''
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 secUtils = CSecurityMarketDataUtils('Z:/StockData')
 from higgsboom.FuncUtils.DateTime import *
@@ -74,6 +80,9 @@ def neu_with_intercept(array_x, array_y):
     return residual
 
 def CAP_standard(array, floatcap):
+    '''
+    风格因子通过流通市值标准化
+    '''
     x = array.replace([np.inf, -np.inf], np.nan).dropna()
     y = floatcap.replace([np.inf, -np.inf], np.nan).dropna()
     intersectID = list(set(x.index) & set(y.index))
@@ -109,10 +118,10 @@ def get_X(t, Index500_StyleFactor, r):
             r.drop(index=[i], inplace=True)
     
     # 去极值
-    Index500_StyleFactor = Winsorize(Index500_StyleFactor, limit=3)
-    # 风格因子标准化（总市值）
+    Index500_StyleFactor = Winsorize(Index500_StyleFactor, limit=5)
+    # 风格因子标准化（流通市值）
     CAP_data = pd.Series(np.exp(Index500_StyleFactor['LNCAP']))
-    CAP_weights = pd.DataFrame(CAP_data / CAP_data.sum()) # 市值/总市值，市值加权
+    CAP_weights = pd.DataFrame(CAP_data / CAP_data.sum()) # 流通市值加权
     CAP_weights.columns =['weight']
     Index500_StyleFactor['LNCAP'] = CAP_standard(Index500_StyleFactor['LNCAP'], CAP_weights['weight'])
     Index500_StyleFactor['Beta'] = CAP_standard(Index500_StyleFactor['Beta'], CAP_weights['weight'])
@@ -223,31 +232,61 @@ def daily_calculate(t):
     # print(Index500_LNCAP) # 市值因子
     Index500_dic = {'LNCAP': Index500_LNCAP, 'Beta': Index500_Beta, 'BP': Index500_BP, 'Earning': Index500_Earning, 'Growth': Index500_Growth,
             'Leverage': Index500_Leverage, 'Liquidity': Index500_Liquidity,'Momentum': Index500_Momentum, 'NLSize': Index500_NLSize, 'Volatility': Index500_Volatility} 
-
     Index500_StyleFactor = pd.DataFrame(Index500_dic, index=IndexCons) # daily style factor
     # print(Index500_StyleFactor)
     # print(Index500_StyleFactor.isnull().any())
+
     # 正交去除共线性
     Index500_StyleFactor['Liquidity'] = neu_with_intercept(Index500_StyleFactor['LNCAP'], Index500_StyleFactor['Liquidity'])
     Index500_StyleFactor['Volatility'] = neu_with_intercept(Index500_StyleFactor['Beta'], Index500_StyleFactor['Volatility'])
     Index500_StyleFactor['Volatility'] = neu_with_intercept(Index500_StyleFactor['LNCAP'], Index500_StyleFactor['Volatility'])
     
     f, u = get_factor_return(t, Index500_StyleFactor) 
+
     f.columns = [t]
     u.columns = [t]
-    # print(f)
-    print(u)
-    return u
+    print(f)
+    # print(u)
+    return f
 
-PeriodList = TradingDays(startDate='2018-01-01', endDate='2021-04-09')
+def plot_return(cumf_ret, namelist):
+    colorlist = ['r', 'g', 'b', 'y', 'm', 'c', 'k', 'purple', 'orange', 'aqua']
+    time = cumf_ret.index.values
+    # time = np.array([i.strftime('%Y-%m-%d') for i in time])
+    plt.title('Pure Factor Return')
+    t = range(0, len(time))
+    i = 0
+    for name in namelist:
+        plt.plot(t, cumf_ret[name], color=colorlist[i], label=name)
+        i = i + 1
+    plt.legend(loc='lower left', fontsize=10) # 标签位置
+    timetic = list(range(0, len(time), len(time)//20))
+    plt.xticks(timetic, labels=time[timetic], rotation=90, fontsize=7)
+    plt.xlim(0, len(time))
+
+    plt.grid(ls='-.')
+    plt.ylabel('Accumulated Return', fontsize=10)
+
+    plt.show()
+    return
+
+
+PeriodList = TradingDays(startDate='2021-01-01', endDate='2021-04-09')
 f_frame = pd.DataFrame() # index行业因子，columns日期
 u_frame = pd.DataFrame()
 pool = ThreadPool()
-u = pool.map(daily_calculate, PeriodList)
-# f_frame = pd.concat(f, axis = 1)
-u_frame = pd.concat(u, axis = 1)
+f = pool.map(daily_calculate, PeriodList)
+f_frame = pd.concat(f, axis = 1)
+# u_frame = pd.concat(u, axis = 1)
+print(f_frame)
+f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
+# u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
 
-# f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_v2.xlsx')
-u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
+# 风格因子的pure factor return
+namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
 
-
+f_stlye_frame = f_frame.loc[namelist, :]
+f_stlye_frame = f_stlye_frame.T
+cumf_style_frame = f_stlye_frame.cumsum()
+print(cumf_style_frame)
+plot_return(cumf_style_frame, namelist)
