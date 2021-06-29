@@ -17,7 +17,7 @@ f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx
 # print(f)
 f = f.T # index是日期，columns是因子名称
 
-def Covariance_NW(F, lambd, delay=2):
+def var_weighted_NW(F, lambd, delay=2):
     '''
     The process to get the Newey_West Adjusted Covariance Matrix
     '''
@@ -61,7 +61,7 @@ def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,n_forward=21,NW=1):
     F = f.iloc[n_start-length:n_start,:]
     lambd = 0.5**(1./tau) # 指数权重
     if NW:
-        F_NW = Covariance_NW(F,lambd)
+        F_NW = var_weighted_NW(F,lambd)
     else:
         F_NW = np.cov(F.T)*21
 
@@ -182,7 +182,6 @@ adj_vk = v_fitting(vk, a=2, n_start_fitting=16)
 
 
 BF_t_all = []
-# lambda_F=[] # factor volatility multiplier
 lambda_F_all=[]
 BF_t_vra_all=[]
 CSV = [] # factor cross-sectional volatility(CSV) on day t

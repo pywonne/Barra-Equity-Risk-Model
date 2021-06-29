@@ -111,7 +111,24 @@ def get_X(t, StyleFactor):
     构建每日因子暴露矩阵X
     t: 日期
     ''' 
-    # 去极值
+    # 构建因子暴露度矩阵 X（1个国家因子+28个行业因子+10个风格因子）
+    # 行业因子暴露
+    IndusCons = secUtils.DailyIndustryConstituents('SW', 'L1', t)   # 申万 L1, 28个行业分类
+    IndusList = []
+    stock = []
+    for i in StyleFactor.index:
+        for key in IndusCons:
+            if i in IndusCons.get(key):
+                IndusList.append(key)
+                stock.append(i)
+                break
+    IndusTmp = pd.DataFrame({'行业': IndusList})
+    IndusFactor = pd.get_dummies(IndusTmp)
+    diff = StyleFactor.index.difference(stock).values
+    StyleFactor.drop(index=diff, inplace=True)
+    IndusFactor.index = StyleFactor.index
+    # print(IndusFactor)
+    # 风格因子去极值
     StyleFactor = Winsorize(StyleFactor, limit=5)
     # 正交去除共线性
     # 风格因子标准化（流通市值）
@@ -131,25 +148,12 @@ def get_X(t, StyleFactor):
     StyleFactor['Volatility'] = neu_with_intercept(StyleFactor['Beta'], StyleFactor['Volatility'])
     StyleFactor['Volatility'] = neu_with_intercept(StyleFactor['LNCAP'], StyleFactor['Volatility'])
     StyleFactor['Volatility'] = CAP_standard(StyleFactor['Volatility'], CAP_weights['weight'])
-    # 构建因子暴露度矩阵 X（1个国家因子+28个行业因子+10个风格因子）
     # 国家因子暴露
     country_data = pd.Series(np.ones(len(StyleFactor)), index = StyleFactor.index, name = 'country').to_frame()
-    # 行业因子暴露
-    IndusCons = secUtils.DailyIndustryConstituents('SW', 'L1', t)   # 申万 L1, 28个行业分类
-    IndusList = []
-    for i in StyleFactor.index:
-        for key in IndusCons:
-            if i in IndusCons.get(key):
-                IndusList.append(key)
-                break
-    IndusTmp = pd.DataFrame({'行业': IndusList})
-    IndusFactor = pd.get_dummies(IndusTmp)
-    IndusFactor.index = StyleFactor.index
-    # print(IndusFactor)
     X = pd.concat([country_data, IndusFactor, StyleFactor], axis = 1)
     # print(X) 
     # X.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/X_daily',t+'.xlsx'))
-    return X, StyleFactor, IndusFactor
+    return X, StyleFactor, IndusFactor, diff
 
 
 def get_factor_return(t, StyleFactor):
@@ -158,10 +162,10 @@ def get_factor_return(t, StyleFactor):
     t: 日期
     '''
     r, adj_Style_Factor = get_daily_return(t, StyleFactor)
-    X, adj_Style_Factor, IndusFactor= get_X(t,adj_Style_Factor)
-    
-    LNCAP_data = pd.Series(adj_Style_Factor['LNCAP']).to_frame()
-    CAP_data = pd.DataFrame(np.exp(LNCAP_data))
+    X, adj_Style_Factor, IndusFactor, diff= get_X(t,adj_Style_Factor)
+    r.drop(index=diff, inplace=True)
+
+    CAP_data = (np.exp(adj_Style_Factor['LNCAP'])).to_frame()
     # 构建权重调整矩阵 V
     adj_weights = pd.DataFrame(np.sqrt(CAP_data) / np.sqrt(CAP_data).sum())
     adj_weights_series = adj_weights.squeeze() # Convert Dataframe to Series type
@@ -208,7 +212,6 @@ def daily_calculate(t):
     StyleFactor.columns = namelist
     StyleFactor.dropna(axis=0, how='any', inplace=True)
     # print(StyleFactor)
-    
     f, u = get_factor_return(t, StyleFactor) 
 
     f.columns = [t]
@@ -241,7 +244,7 @@ def plot_return(cumf_ret, namelist):
 
 
 namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
-PeriodList = TradingDays(startDate='2018-01-01', endDate='2021-04-09')
+PeriodList = TradingDays(startDate='2017-06-01', endDate='2017-12-31')
 f_frame = pd.DataFrame() # index行业因子，columns日期
 u_frame = pd.DataFrame()
 pool = ThreadPool()
@@ -249,12 +252,12 @@ f = pool.map(daily_calculate, PeriodList)
 f_frame = pd.concat(f, axis = 1)
 # u_frame = pd.concat(u, axis = 1)
 # print(f_frame)
-# f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
+f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/all_stock/f_ret_final_2017_2.xlsx')
 # u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
 
 # 风格因子的pure factor return
-f_stlye_frame = f_frame.loc[namelist, :]
-f_stlye_frame = f_stlye_frame.T
-cumf_style_frame = f_stlye_frame.cumsum()
-print(cumf_style_frame)
-plot_return(cumf_style_frame, namelist)
+# f_stlye_frame = f_frame.loc[namelist, :]
+# f_stlye_frame = f_stlye_frame.T
+# cumf_style_frame = f_stlye_frame.cumsum()
+# print(cumf_style_frame)
+# plot_return(cumf_style_frame, namelist)

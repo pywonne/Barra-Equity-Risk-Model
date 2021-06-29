@@ -161,8 +161,7 @@ def get_factor_return(t, Index500_StyleFactor):
     r, adj_Style_Factor = get_daily_return(t, Index500_StyleFactor)
     X, adj_Style_Factor, IndusFactor = get_X(t,adj_Style_Factor)
     
-    LNCAP_data = pd.Series(adj_Style_Factor['LNCAP']).to_frame()
-    CAP_data = pd.DataFrame(np.exp(LNCAP_data))
+    CAP_data = (np.exp(adj_Style_Factor['LNCAP'])).to_frame()
     # 构建权重调整矩阵 V
     adj_weights = pd.DataFrame(np.sqrt(CAP_data) / np.sqrt(CAP_data).sum())
     adj_weights_series = adj_weights.squeeze() # Convert Dataframe to Series type
