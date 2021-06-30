@@ -244,7 +244,7 @@ def plot_return(cumf_ret, namelist):
 
 
 namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
-PeriodList = TradingDays(startDate='2017-06-01', endDate='2017-12-31')
+PeriodList = TradingDays(startDate='2016-01-01', endDate='2016-12-31')
 f_frame = pd.DataFrame() # index行业因子，columns日期
 u_frame = pd.DataFrame()
 pool = ThreadPool()
@@ -252,7 +252,7 @@ f = pool.map(daily_calculate, PeriodList)
 f_frame = pd.concat(f, axis = 1)
 # u_frame = pd.concat(u, axis = 1)
 # print(f_frame)
-f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/all_stock/f_ret_final_2017_2.xlsx')
+f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/all_stock/f_ret_final_2016.xlsx')
 # u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
 
 # 风格因子的pure factor return
