@@ -1,7 +1,7 @@
 '''
 @author：Yiwen Pan
 计算daily因子收益率向量f和特质收益率向量u
-
+因子数据：2009-01-05 至 2021-05-13
 portfolio：中证500
 '''
 from sys import float_repr_style
@@ -14,10 +14,8 @@ import pandas as pd
 from scipy import stats
 import pickle 
 import matplotlib.pyplot as plt
-import os
 
-# plt.rcParams["font.family"]="STSong"
-# plt.rcParams['axes.unicode_minus']=False
+
 LNCAP_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_LNCAP.pkl', 'rb') 
 LNCAP_data = pd.DataFrame(pickle.load(LNCAP_file))
 Beta_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_Beta.pkl', 'rb') 
@@ -136,7 +134,10 @@ def get_X(t, Index500_StyleFactor):
     # 国家因子暴露
     country_data = pd.Series(np.ones(len(Index500_StyleFactor)), index = Index500_StyleFactor.index, name = 'country').to_frame()
     # 行业因子暴露
-    IndusCons = secUtils.DailyIndustryConstituents('SW', 'L1', t)   # 申万 L1, 28个行业分类
+    try:
+        IndusCons = secUtils.DailyIndustryConstituents('SW', 'L1', t)   # 申万 L1, 28个行业分类
+    except:
+        IndusCons = secUtils.LatestIndustryConstituents('SW', 'L1')
     IndusList = []
     for i in Index500_StyleFactor.index:
         for key in IndusCons:
@@ -153,7 +154,7 @@ def get_X(t, Index500_StyleFactor):
     return X, Index500_StyleFactor, IndusFactor
 
 
-def get_factor_return(t, Index500_StyleFactor):
+def get_daily_factor_return(t, Index500_StyleFactor):
     '''
     构建每日因子收益率f和特质股票收益率u
     t: 日期
@@ -201,7 +202,7 @@ def get_factor_return(t, Index500_StyleFactor):
     # print(f) #30*1
     return f, u 
 
-def daily_calculate(t):
+def daily_calculate(t, flag):
     Index500_LNCAP = []
     Index500_Beta = []
     Index500_BP = []
@@ -234,13 +235,18 @@ def daily_calculate(t):
     # print(Index500_StyleFactor)
     # print(Index500_StyleFactor.isnull().any())
     
-    f, u = get_factor_return(t, Index500_StyleFactor) 
+    f, u = get_daily_factor_return(t, Index500_StyleFactor) 
 
     f.columns = [t]
     u.columns = [t]
-    print(f)
-    # print(u)
-    return f
+    if flag == 1:
+        # print(f)
+        print(t+' completed')
+        return f
+    else: # flag = 0
+        # print(u)
+        print(t + 'completed')
+        return u
 
 def plot_return(cumf_ret, namelist):
     colorlist = ['r', 'g', 'b', 'y', 'm', 'c', 'k', 'purple', 'orange', 'aqua']
@@ -263,23 +269,46 @@ def plot_return(cumf_ret, namelist):
     plt.show()
     return
 
+def daily_factor_calculate(t):
+    f = daily_calculate(t, flag=1)
+    return f
+def daily_specific_calculate(t):
+    u = daily_calculate(t, flag=0) 
+    return u
+     
+    f_frame = pd.DataFrame()
+    pool = ThreadPool()
+    f = pool.map(daily_factor_calculate, PeriodList)
+    f_frame = pd.concat(f, axis = 1)
+    print(f_frame)
+    # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
+    return f_frame
 
-PeriodList = TradingDays(startDate='2021-04-01', endDate='2021-04-09')
-f_frame = pd.DataFrame() # index行业因子，columns日期
-u_frame = pd.DataFrame()
-pool = ThreadPool()
-f = pool.map(daily_calculate, PeriodList)
-f_frame = pd.concat(f, axis = 1)
-# u_frame = pd.concat(u, axis = 1)
-print(f_frame)
-# f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
-# u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
 
-# 风格因子的pure factor return
-namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
+def get_specific_return(PeriodList):
+    u_frame = pd.DataFrame()
+    pool = ThreadPool()
+    u = pool.map(daily_specific_calculate, PeriodList)
+    u_frame = pd.concat(u, aixs = 1)
+    print(u_frame)
+    # u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
+    return u_frame
 
-f_stlye_frame = f_frame.loc[namelist, :]
-f_stlye_frame = f_stlye_frame.T
-cumf_style_frame = f_stlye_frame.cumsum()
-print(cumf_style_frame)
-plot_return(cumf_style_frame, namelist)
+
+
+# plot风格因子的pure factor return
+# f_stlye_frame = f_frame.loc[namelist, :]
+# f_stlye_frame = f_stlye_frame.T
+# cumf_style_frame = f_stlye_frame.cumsum()
+# print(cumf_style_frame)
+# plot_return(cumf_style_frame, namelist)
+
+
+if __name__ == "__main__":
+    print('Barra Equity Risk Model')
+    date = input('输入日期(yyyy-mm-dd)：')
+    # 需要得到日期前252天的时序收益率
+    namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
+    preWindow = PreTradingWindow(date, 252)
+    print('获取因子收益率时序：')
+    f_frame = get_factor_return(preWindow)

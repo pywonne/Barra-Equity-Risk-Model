@@ -132,7 +132,7 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
     cov_VRA = cov_Eigen.values
     dia_i = list(range(len(cov_VRA)))
     cov_VRA[dia_i,dia_i] = lambda_F ** 2 * cov_VRA[dia_i,dia_i]
-     
+    
     return pd.DataFrame(cov_VRA, index=f.columns, columns=f.columns)
 
 length = 252
