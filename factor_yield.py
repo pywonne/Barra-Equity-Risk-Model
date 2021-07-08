@@ -39,6 +39,7 @@ Volatility_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_
 Volatility_data = pd.DataFrame(pickle.load(Volatility_file))
 u_frame = pd.DataFrame()
 f_frame = pd.DataFrame()
+X_dict = {}
 
 def get_daily_return(t, Index500_Factor):
     '''
@@ -113,6 +114,7 @@ def get_X(t, Index500_StyleFactor):
     构建每日因子暴露矩阵X
     t: 日期
     ''' 
+    global X_dict
     # 去极值
     Index500_StyleFactor = Winsorize(Index500_StyleFactor, limit=5)
     # 正交去除共线性
@@ -152,6 +154,7 @@ def get_X(t, Index500_StyleFactor):
     IndusFactor.index = Index500_StyleFactor.index
     # print(IndusFactor)
     X = pd.concat([country_data, IndusFactor, Index500_StyleFactor], axis = 1)
+    X_dict[t] = X
     # print(X) 
     # X.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/X_daily',t+'.xlsx'))
     return X, Index500_StyleFactor, IndusFactor
@@ -238,18 +241,15 @@ def daily_calculate(t):
     Index500_StyleFactor = pd.DataFrame(Index500_dic, index=IndexCons) # daily style factor
     Index500_StyleFactor.dropna(axis=0, how='any', inplace=True)
     # print(Index500_StyleFactor)
-    # print(Index500_StyleFactor.isnull().any())
     
     f, u = get_daily_factor_return(t, Index500_StyleFactor) 
-
     f.columns = [t]
     u.columns = [t]
     
-    # print(f)
     print(t+': completed')
     f_frame = pd.concat([f_frame, f], axis=1)
     u_frame = pd.concat([u_frame, u], axis=1)
-    
+    return
 
 def plot_return(cumf_ret, namelist):
     colorlist = ['r', 'g', 'b', 'y', 'm', 'c', 'k', 'purple', 'orange', 'aqua']
@@ -277,7 +277,7 @@ def get_time_series_return(PeriodList):
     Multiprocessing
     '''
     pool = ThreadPool()
-    pool.map(daily_calculate, PeriodList)
+    res = pool.map(daily_calculate, PeriodList)
     # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
 
 
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     # 需要得到日期前252天的时序因子收益率
     namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
     preWindow = PreTradingWindow(date, 252)
-    print('获取因子和特质收益率时序中：')
+    print('获取因子和特质时序收益率中...')
     get_time_series_return(preWindow)
     print('-----------------------因子收益率时序------------------------')
     f_frame = f_frame.sort_index(axis=1)
@@ -302,6 +302,7 @@ if __name__ == "__main__":
     print('-----------------------特质收益率时序------------------------')
     u_frame = u_frame.sort_index(axis=1)
     print(u_frame)
+    print(f_frame.columns.difference(u_frame.columns))
     # 计算因子收益率协方差矩阵
     v_all = []
     f_frame = f_frame.T # index是日期， columns是股票
@@ -316,7 +317,16 @@ if __name__ == "__main__":
     D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
     F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
     f_i = Volatility_Adjust(f_frame, F_Eigen_Adjusted, tau=42)
-    print('-----------------------调整后的因子协方差矩阵-----------------------')
+    print('-----------------------调整后的因子收益率协方差矩阵-----------------------')
     print(f_i)
     # 计算特质收益率协方差矩阵
-    
+    u_frame = u_frame.T # index是日期，columns是stock
+    u_frame = u_frame.dropna(axis=1)
+    t = u_frame.index.tolist()[251] # 第t天
+    u_i = Volatility_Adjust(u_frame, t, X_dict[t])
+    u_i = u_i.sort_index()
+    u_i = u_i.squeeze()
+    u_i = pd.DataFrame(np.diag(u_i), index = u_frame.columns, columns = u_frame.columns)
+    print('-----------------------调整后的特质收益率协方差矩阵-----------------------')
+    print(t)
+    print(u_i)

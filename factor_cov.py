@@ -133,8 +133,8 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
 # length = 252
 # n_forward = 21
 # tau = 90
-Bias = []
-v_all = []
+# Bias = []
+# v_all = []
 # for i in range(length, f.shape[0]-n_forward, 21):
 #     #---------------Newey-West Adjustment得出调整后协方差矩阵-----------------------------
 #     F, U, F_NW_Adjusted, std_i = Newey_West_Adjusted(f, tau=tau,length=length, n_start=i, n_forward=n_forward, NW=1)

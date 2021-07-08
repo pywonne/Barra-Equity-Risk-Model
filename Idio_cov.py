@@ -23,7 +23,7 @@ u = u.sort_index()
 u = u.T # index是日期，columns是stock
 # print(u)
 
-def var_weighted(self, d=0):
+def var_weighted(self, d=0, tau=90):
     '''
     计算指数加权方差
     d：滞后期delay的指数加权方差
@@ -62,7 +62,7 @@ def Newey_West_Adjusted(self,delay=2,NW=0):
     var_TS = 21 * var_init
     return pd.Series(np.array(var_TS)[0], index = var_TS.columns)
 
-def Structural_Adjusted(self, t):
+def Structural_Adjusted(self, t, X):
     '''
     将特质波动率按照gamma进行结构化调整
     t: 第t日
@@ -78,7 +78,7 @@ def Structural_Adjusted(self, t):
     Stock_nadjust = gamma_n.index[gamma_n == 1] # gamma为1的，大部分股票gamma都为1
     Stock_adjust = gamma_n.index[gamma_n != 1] # gamma 不为1的
     
-    X = pd.read_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/X_daily',t+'.xlsx'), header=0, index_col=0)
+    # X = pd.read_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/X_daily',t+'.xlsx'), header=0, index_col=0)
     # X: index是股票，columns是因子
     # 进行线性回归
     y = np.log(var_TS.loc[Stock_nadjust.intersection(X.index)])
@@ -93,14 +93,14 @@ def Structural_Adjusted(self, t):
     return gamma_n * var_TS + (1 - gamma_n) * var_STR
 
 
-def Bayesian_Shrinkage(self, t, q=1):
+def Bayesian_Shrinkage(self, t, X, q=1):
     """
     将特质波动率分为十个组进行Bayesian Shrinkage
     t: 第t日的数据, string
     q：收缩参数，int
     return：返回贝叶斯收缩结果，series
     """
-    var_hat = Structural_Adjusted(self,t)
+    var_hat = Structural_Adjusted(self,t, X)
     var_hat = pd.DataFrame(var_hat, index = self.columns) # index是股票， columns是波动率
     var_hat['Code'] = var_hat.index
     var_hat.columns = ['Variance','Code'] 
@@ -125,7 +125,7 @@ def Bayesian_Shrinkage(self, t, q=1):
     result.index = res['Code'].values
     return result
 
-def Volatility_Adjusted(self, t, tau=42):
+def Volatility_Adjusted(self, t, X, tau=42):
     '''
     各个截面上的股票之间有一定相互的影响，进行Volatility的调整
     self: 特质收益率
@@ -137,31 +137,30 @@ def Volatility_Adjusted(self, t, tau=42):
     b =  self.dot(np.diag(1 / self.std()))  # std为一个每支股票在一段时间内的std的Series
     BS_t = np.sqrt((b ** 2).sum(axis=1) / self.shape[1]) # 等权平均
     lambda_F = np.sqrt(np.sum(BS_t ** 2 * w) / np.sum(w))
-    var_BSA = Bayesian_Shrinkage(self, t)
+    var_BSA = Bayesian_Shrinkage(self, t, X)
     var_VRA = lambda_F ** 2 * var_BSA
     var_VRA = var_VRA.sort_index()
     var_VRA = var_VRA.to_frame()
     var_VRA.columns = [t]
     return var_VRA
 
-'''
-时间窗口取252天
-'''
-length = 252 
-n_forward = 21
-tau = 90
-frequency = 21
-u_cov = pd.DataFrame()
-for i in range(length, u.shape[0], frequency):
-    tmp = u.iloc[i-length:i, :]
-    tmp = tmp.dropna(axis = 1)
-    t = u.index.tolist()[i-1] # 天数
-    u_i = Volatility_Adjusted(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
-    u_i = u_i.sort_index()
-    u_i = u_i.squeeze()
-    u_i = pd.DataFrame(np.diag(u_i), index = tmp.columns, columns = tmp.columns)
-    print(t)
-    print(u_i)
-    u_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/u_adjusted_cov_monthly',t+'.xlsx'))
-    
+# '''
+# 时间窗口取252天
+# '''
+# length = 252 
+# tau = 90
+# frequency = 21
+# u_cov = pd.DataFrame()
+# for i in range(length, u.shape[0], frequency):
+#     tmp = u.iloc[i-length:i, :]
+#     tmp = tmp.dropna(axis = 1)
+#     t = u.index.tolist()[i-1] # 天数
+#     u_i = Volatility_Adjusted(tmp, t) # 特质协方差delta为一个N*N的diagonal matrix
+#     u_i = u_i.sort_index()
+#     u_i = u_i.squeeze()
+#     u_i = pd.DataFrame(np.diag(u_i), index = tmp.columns, columns = tmp.columns)
+#     print(t)
+#     print(u_i)
+#     u_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/u_adjusted_cov_monthly',t+'.xlsx'))
+
 
