@@ -14,10 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import pickle 
-import queue
 import matplotlib.pyplot as plt
-from functools import partial
-
 
 
 LNCAP_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_LNCAP.pkl', 'rb') 
@@ -40,6 +37,8 @@ NLSize_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_NLSI
 NLSize_data = pd.DataFrame(pickle.load(NLSize_file))
 Volatility_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_Volatility.pkl', 'rb')
 Volatility_data = pd.DataFrame(pickle.load(Volatility_file))
+u_frame = pd.DataFrame()
+f_frame = pd.DataFrame()
 
 def get_daily_return(t, Index500_Factor):
     '''
@@ -206,7 +205,9 @@ def get_daily_factor_return(t, Index500_StyleFactor):
     # print(f) #30*1
     return f, u 
 
-def daily_calculate(t, flag):
+def daily_calculate(t):
+    global u_frame
+    global f_frame
     Index500_LNCAP = []
     Index500_Beta = []
     Index500_BP = []
@@ -243,14 +244,12 @@ def daily_calculate(t, flag):
 
     f.columns = [t]
     u.columns = [t]
-    if flag == 1:
-        # print(f)
-        print(t+' completed')
-        return f
-    else: # flag = 0
-        # print(u)
-        print(t + 'completed')
-        return u
+    
+    # print(f)
+    print(t+': completed')
+    f_frame = pd.concat([f_frame, f], axis=1)
+    u_frame = pd.concat([u_frame, u], axis=1)
+    
 
 def plot_return(cumf_ret, namelist):
     colorlist = ['r', 'g', 'b', 'y', 'm', 'c', 'k', 'purple', 'orange', 'aqua']
@@ -272,34 +271,14 @@ def plot_return(cumf_ret, namelist):
 
     plt.show()
     return
-
-def daily_factor_calculate(t):
-    f = daily_calculate(t, flag=1)
-    return f
-def daily_specific_calculate(t):
-    u = daily_calculate(t, flag=0) 
-    return u
      
-def get_factor_return(PeriodList):
-    f_frame = pd.DataFrame()
+def get_time_series_return(PeriodList): 
+    '''
+    Multiprocessing
+    '''
     pool = ThreadPool()
-    u_queue = queue.Queue()
-    f = pool.map(partial(daily_factor_calculate, q = u_queue), PeriodList)
-    f_frame = pd.concat(f, axis = 1)
-    print(f_frame)
+    pool.map(daily_calculate, PeriodList)
     # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
-    return f_frame
-
-
-def get_specific_return(PeriodList):
-    u_frame = pd.DataFrame()
-    pool = ThreadPool()
-    u = pool.map(daily_specific_calculate, PeriodList)
-    u_frame = pd.concat(u, aixs = 1)
-    print(u_frame)
-    # u_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx')
-    return u_frame
-
 
 
 # plot风格因子的pure factor return
@@ -315,9 +294,14 @@ if __name__ == "__main__":
     # 需要得到日期前252天的时序因子收益率
     namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
     preWindow = PreTradingWindow(date, 252)
-    print('获取因子收益率时序中：')
-    
-    f_frame = get_factor_return(preWindow)
+    print('获取因子和特质收益率时序中：')
+    get_time_series_return(preWindow)
+    print('-----------------------因子收益率时序------------------------')
+    f_frame = f_frame.sort_index(axis=1)
+    print(f_frame)
+    print('-----------------------特质收益率时序------------------------')
+    u_frame = u_frame.sort_index(axis=1)
+    print(u_frame)
     # 计算因子收益率协方差矩阵
     v_all = []
     f_frame = f_frame.T # index是日期， columns是股票
@@ -332,11 +316,7 @@ if __name__ == "__main__":
     D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
     F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
     f_i = Volatility_Adjust(f_frame, F_Eigen_Adjusted, tau=42)
-    print('调整后的因子协方差矩阵：')
+    print('-----------------------调整后的因子协方差矩阵-----------------------')
     print(f_i)
-    # 获取日期前252天的特质收益率
-    print('获取特质收益率时序中：')
-    u_frame = get_specific_return(preWindow)
-
     # 计算特质收益率协方差矩阵
-    X_date = pd.DataFrame()
+    
