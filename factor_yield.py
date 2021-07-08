@@ -4,7 +4,8 @@
 因子数据：2009-01-05 至 2021-05-13
 portfolio：中证500
 '''
-from sys import float_repr_style
+from pandas.core.frame import DataFrame
+from factor_cov import Eigen_Adjusted, Newey_West_Adjusted, Volatility_Adjust, v_fitting
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 secUtils = CSecurityMarketDataUtils('Z:/StockData')
 from higgsboom.FuncUtils.DateTime import *
@@ -13,7 +14,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import pickle 
+import queue
 import matplotlib.pyplot as plt
+from functools import partial
+
 
 
 LNCAP_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_LNCAP.pkl', 'rb') 
@@ -276,9 +280,11 @@ def daily_specific_calculate(t):
     u = daily_calculate(t, flag=0) 
     return u
      
+def get_factor_return(PeriodList):
     f_frame = pd.DataFrame()
     pool = ThreadPool()
-    f = pool.map(daily_factor_calculate, PeriodList)
+    u_queue = queue.Queue()
+    f = pool.map(partial(daily_factor_calculate, q = u_queue), PeriodList)
     f_frame = pd.concat(f, axis = 1)
     print(f_frame)
     # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
@@ -303,12 +309,34 @@ def get_specific_return(PeriodList):
 # print(cumf_style_frame)
 # plot_return(cumf_style_frame, namelist)
 
-
 if __name__ == "__main__":
     print('Barra Equity Risk Model')
     date = input('输入日期(yyyy-mm-dd)：')
-    # 需要得到日期前252天的时序收益率
+    # 需要得到日期前252天的时序因子收益率
     namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
     preWindow = PreTradingWindow(date, 252)
-    print('获取因子收益率时序：')
+    print('获取因子收益率时序中：')
+    
     f_frame = get_factor_return(preWindow)
+    # 计算因子收益率协方差矩阵
+    v_all = []
+    f_frame = f_frame.T # index是日期， columns是股票
+    f_frame = f_frame.astype(float)
+    F, U, F_NW, std_i = Newey_West_Adjusted(f_frame, tau=90, n_start=252, length=252, NW=1)
+    vi = Eigen_Adjusted(F_NW, U, std_i, length=252,N_mc=1000)
+    print(vi)
+    v_all.append(vi)
+    vk = np.array(v_all).mean(axis=0)
+    adj_vk = v_fitting(vk, a=2, n_start_fitting=16)
+    D0, U0 = np.linalg.eigh(F_NW)
+    D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
+    F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
+    f_i = Volatility_Adjust(f_frame, F_Eigen_Adjusted, tau=42)
+    print('调整后的因子协方差矩阵：')
+    print(f_i)
+    # 获取日期前252天的特质收益率
+    print('获取特质收益率时序中：')
+    u_frame = get_specific_return(preWindow)
+
+    # 计算特质收益率协方差矩阵
+    X_date = pd.DataFrame()

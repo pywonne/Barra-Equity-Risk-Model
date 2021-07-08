@@ -14,7 +14,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx', header=0, index_col=0)
-# print(f)
 f = f.T # index是日期，columns是因子名称
 
 def var_weighted_NW(F, lambd, delay=2):
@@ -23,7 +22,7 @@ def var_weighted_NW(F, lambd, delay=2):
     '''
     Tn = F.shape[0] # time
     Fn = F.shape[1] # factor
-    w = np.array([lambd**n for n in range(Tn)][::-1])
+    w = np.array([lambd**n for n in range(Tn)][::-1], dtype='float32')
     w = w/w.sum()
     
     # weighted average of factors
@@ -50,7 +49,7 @@ def var_weighted_NW(F, lambd, delay=2):
         F_NW += 21.*( (1-d/(delay+1.)) * (cov_nw_i + cov_nw_i.T) )
     return F_NW
 
-def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,n_forward=21,NW=1):
+def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,NW=1):
     '''
     f：因子收益率
     tau: 半衰期指数
@@ -66,17 +65,14 @@ def Newey_West_Adjusted(f,tau=90,length=100,n_start=100,n_forward=21,NW=1):
         F_NW = np.cov(F.T)*21
 
     D0, U0 = np.linalg.eigh(F_NW)
-    
-    r = (f.iloc[n_start:n_start+n_forward,:]+1).cumprod().iloc[-1,:]-1
-    R_eigen = np.dot(U0.T,r)
     Var_eigen = D0
+    # r = (f.iloc[n_start:n_start+n_forward,:]+1).cumprod().iloc[-1,:]-1
     
     if not np.allclose(F_NW, U0.dot(np.diag(D0)).dot(U0.T)):
         print('ERROR in eigh')
         return
     
-    return F, U0, F_NW, R_eigen, np.sqrt(Var_eigen)
-
+    return F, U0, F_NW, np.sqrt(Var_eigen)
 
 def Eigen_Adjusted(F_NW, U, std_i, length=252, N_mc=1000):
     '''
@@ -126,7 +122,6 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
     b = self.dot(np.diag(1 / self.std()))
     B_Ft = np.sqrt((b ** 2).sum(axis=1) / self.shape[1])
     lambda_F = np.sqrt(np.sum(B_Ft ** 2 * w)/np.sum(w))
-    lambda_F_all.append(lambda_F)
     
     #对角线乘上lambda_F的平方
     cov_VRA = cov_Eigen.values
@@ -135,69 +130,69 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
     
     return pd.DataFrame(cov_VRA, index=f.columns, columns=f.columns)
 
-length = 252
-n_forward = 21
-tau = 90
+# length = 252
+# n_forward = 21
+# tau = 90
 Bias = []
 v_all = []
-for i in range(length, f.shape[0]-n_forward, 21):
-    #---------------Newey-West Adjustment得出调整后协方差矩阵-----------------------------
-    F, U, F_NW_Adjusted, R_i, std_i = Newey_West_Adjusted(f, tau=tau,length=length, n_start=i, n_forward=n_forward, NW=1)
-    # print(F_NW_Adjusted)
-    # print(np.all(np.linalg.eigvals(F_NW_Adjusted) >= 0))
-    Bias.append(R_i/std_i)
-    # --------------Eigenfactor Adjustment每日做一次Monte Carlo Simulation---------------
-    vi = Eigen_Adjusted(F_NW_Adjusted, U, std_i, length=252,N_mc=1000)
-    print(vi)
-    v_all.append(vi)
-# Figure 4.1
-# Bias = np.array(Bias)
-# Bias_eigen = [np.std(Bias[:,x]) for x in range(Bias.shape[1])]
-# plt.plot(Bias_eigen,'-*')
-# plt.show()
+# for i in range(length, f.shape[0]-n_forward, 21):
+#     #---------------Newey-West Adjustment得出调整后协方差矩阵-----------------------------
+#     F, U, F_NW_Adjusted, std_i = Newey_West_Adjusted(f, tau=tau,length=length, n_start=i, n_forward=n_forward, NW=1)
+#     # print(F_NW_Adjusted)
+#     # print(np.all(np.linalg.eigvals(F_NW_Adjusted) >= 0))
+   
+#     # --------------Eigenfactor Adjustment每日做一次Monte Carlo Simulation---------------
+#     vi = Eigen_Adjusted(F_NW_Adjusted, U, std_i, length=252,N_mc=1000)
+#     print(vi)
+#     v_all.append(vi)
+# # Figure 4.1
+# # Bias = np.array(Bias)
+# # Bias_eigen = [np.std(Bias[:,x]) for x in range(Bias.shape[1])]
+# # plt.plot(Bias_eigen,'-*')
+# # plt.show()
 
-# Figure 4.3
-# for i in range(len(v_all)):
-#     plt.plot(v_all[i])
-# plt.show()
-vk = np.array(v_all).mean(axis=0)
-# print('------------------------MEAN BIAS----------------------------------')
-# print(vk)
-adj_vk = v_fitting(vk, a=2, n_start_fitting=16)
-# print('-----------------------ADJUSTED BIAS-------------------------------')
-# print(adj_vk)
+# # Figure 4.3
+# # for i in range(len(v_all)):
+# #     plt.plot(v_all[i])
+# # plt.show()
+# vk = np.array(v_all).mean(axis=0)
+# # print('------------------------MEAN BIAS----------------------------------')
+# # print(vk)
+# adj_vk = v_fitting(vk, a=2, n_start_fitting=16)
+# # print('-----------------------ADJUSTED BIAS-------------------------------')
+# # print(adj_vk)
 
-# Bias2 = []
-# for i in range(length,f.shape[0]-n_forward,21):
-#     data_cov, U, F_NW, R_i, Std_i = Newey_West_Adjusted(f,tau=tau,length=length,n_start=i,n_forward=n_forward,NW=1)
-#     s, U = np.linalg.eigh(F_NW)
-#     F_eigen = U.dot(np.diag(adj_vk ** 2).dot(np.diag(s))).dot(U.T)
-#     s2, U2 = np.linalg.eigh(F_eigen)
-#     R_eigen2 = R_i #np.dot(U2.T,R_i)
-#     Bias2.append(R_eigen2/np.sqrt(s2))
-# # Figure 4.4 of UNE4
-# B2=np.array(Bias2).std(axis=0)
-# plt.plot(B2,'-*')
-# plt.show()
+# # Bias2 = []
+# # for i in range(length,f.shape[0]-n_forward,21):
+# #     data_cov, U, F_NW, R_i, Std_i = Newey_West_Adjusted(f,tau=tau,length=length,n_start=i,n_forward=n_forward,NW=1)
+# #     s, U = np.linalg.eigh(F_NW)
+# #     F_eigen = U.dot(np.diag(adj_vk ** 2).dot(np.diag(s))).dot(U.T)
+# #     s2, U2 = np.linalg.eigh(F_eigen)
+# #     R_eigen2 = R_i #np.dot(U2.T,R_i)
+# #     Bias2.append(R_eigen2/np.sqrt(s2))
+# # # Figure 4.4 of UNE4
+# # B2=np.array(Bias2).std(axis=0)
+# # plt.plot(B2,'-*')
+# # plt.show()
 
 
-BF_t_all = []
-lambda_F_all=[]
-BF_t_vra_all=[]
-CSV = [] # factor cross-sectional volatility(CSV) on day t
-for i in range(length, f.shape[0]-n_forward, 21):
-    F, U, F_NW, R_i, Std_i = Newey_West_Adjusted(f,tau=tau,n_start=i,length=length
-                                                    ,n_forward=n_forward,NW=1)
-    # ---------------------------Volatility Regime Adjustment-------------------------------
-    D0, U0 = np.linalg.eigh(F_NW_Adjusted)
-    D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
-    F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
+# BF_t_all = []
+# lambda_F_all=[]
+# BF_t_vra_all=[]
+# CSV = [] # factor cross-sectional volatility(CSV) on day t
+# for i in range(length, f.shape[0]-n_forward, 21):
+#     F, U, F_NW, R_i, Std_i = Newey_West_Adjusted(f,tau=tau,n_start=i,length=length
+#                                                     ,n_forward=n_forward,NW=1)
+#     # ---------------------------Volatility Regime Adjustment-------------------------------
+#     D0, U0 = np.linalg.eigh(F_NW_Adjusted)
+#     D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
+#     F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))
   
-    tmp = f.iloc[i-length:i,:]
-    t = f.index.tolist()[i-1] # 天数
-    f_i = Volatility_Adjust(tmp, F_Eigen_Adjusted, tau=42)
+#     tmp = f.iloc[i-length:i,:]
+#     t = f.index.tolist()[i-1] # 天数
+#     f_i = Volatility_Adjust(tmp, F_Eigen_Adjusted, tau=42)
 
-    f_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/f_adjusted_cov_monthly',t+'.xlsx'))
+#     f_i.to_excel(os.path.join('C:/Users/panyi/Documents/BarraFactorsLibrary/f_adjusted_cov_monthly',t+'.xlsx'))
    
 
-        
+
