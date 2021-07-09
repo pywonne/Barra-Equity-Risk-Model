@@ -278,7 +278,11 @@ def get_time_series_return(PeriodList):
     Multiprocessing
     '''
     pool = ThreadPool()
-    res = pool.map(daily_calculate, PeriodList)
+    result = pool.map(daily_calculate, PeriodList)
+
+    pool.close()
+    pool.join()
+    
     # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
 
 
@@ -304,7 +308,6 @@ if __name__ == "__main__":
     print('-----------------------特质收益率时序------------------------')
     u_frame = u_frame.sort_index(axis=1)
     print(u_frame)
-    print(f_frame.columns.difference(u_frame.columns))
     # 计算因子收益率协方差矩阵
     v_all = []
     f_frame = f_frame.T # index是日期， columns是股票
@@ -325,8 +328,8 @@ if __name__ == "__main__":
     u_frame = u_frame.T # index是日期，columns是stock
     u_frame = u_frame.astype(float)
     u_frame = u_frame.dropna(axis=1)
-    # t = u_frame.index.tolist()[len(u_frame)-1] # 第t天
-    u_i = Volatility_Adjusted(u_frame, date, X_dict[date])
+    t = u_frame.index.tolist()[len(u_frame)-1] # 第t天
+    u_i = Volatility_Adjusted(u_frame, t, X_dict[t])
     u_i = u_i.sort_index()
     u_i = u_i.squeeze()
     u_i = pd.DataFrame(np.diag(u_i), index = u_frame.columns, columns = u_frame.columns)

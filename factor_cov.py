@@ -7,11 +7,9 @@ Volatility Regime Adjustment
 
 Portfolio：中证500
 '''
-from higgsboom.MarketData.CSecurityMarketDataUtils import *
-secUtils = CSecurityMarketDataUtils('Z:/StockData')
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx', header=0, index_col=0)
 f = f.T # index是日期，columns是因子名称
