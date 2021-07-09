@@ -4,8 +4,8 @@
 因子数据：2009-01-05 至 2021-05-13
 portfolio：中证500
 '''
-from pandas.core.frame import DataFrame
 from factor_cov import Eigen_Adjusted, Newey_West_Adjusted, Volatility_Adjust, v_fitting
+from Idio_cov import Volatility_Adjusted
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 secUtils = CSecurityMarketDataUtils('Z:/StockData')
 from higgsboom.FuncUtils.DateTime import *
@@ -165,6 +165,8 @@ def get_daily_factor_return(t, Index500_StyleFactor):
     构建每日因子收益率f和特质股票收益率u
     t: 日期
     '''
+    global u_frame
+    global f_frame
     r, adj_Style_Factor = get_daily_return(t, Index500_StyleFactor)
     X, adj_Style_Factor, IndusFactor = get_X(t,adj_Style_Factor)
     
@@ -206,11 +208,14 @@ def get_daily_factor_return(t, Index500_StyleFactor):
     # 计算特质股票收益率向量u
     u = r - X.dot(f)
     # print(f) #30*1
+    f.columns = [t]
+    u.columns = [t]
+    
+    f_frame = pd.concat([f_frame, f], axis=1)
+    u_frame = pd.concat([u_frame, u], axis=1)
     return f, u 
 
 def daily_calculate(t):
-    global u_frame
-    global f_frame
     Index500_LNCAP = []
     Index500_Beta = []
     Index500_BP = []
@@ -242,13 +247,9 @@ def daily_calculate(t):
     Index500_StyleFactor.dropna(axis=0, how='any', inplace=True)
     # print(Index500_StyleFactor)
     
-    f, u = get_daily_factor_return(t, Index500_StyleFactor) 
-    f.columns = [t]
-    u.columns = [t]
-    
+    get_daily_factor_return(t, Index500_StyleFactor) 
     print(t+': completed')
-    f_frame = pd.concat([f_frame, f], axis=1)
-    u_frame = pd.concat([u_frame, u], axis=1)
+
     return
 
 def plot_return(cumf_ret, namelist):
@@ -292,8 +293,9 @@ if __name__ == "__main__":
     print('Barra Equity Risk Model')
     date = input('输入日期(yyyy-mm-dd)：')
     # 需要得到日期前252天的时序因子收益率
+    nextDate = NextTradingDate(date)
     namelist = ['LNCAP', 'Beta', 'BP', 'Earning', 'Growth', 'Leverage', 'Liquidity', 'Momentum', 'NLSize', 'Volatility']
-    preWindow = PreTradingWindow(date, 252)
+    preWindow = PreTradingWindow(nextDate, 252)
     print('获取因子和特质时序收益率中...')
     get_time_series_return(preWindow)
     print('-----------------------因子收益率时序------------------------')
@@ -321,12 +323,12 @@ if __name__ == "__main__":
     print(f_i)
     # 计算特质收益率协方差矩阵
     u_frame = u_frame.T # index是日期，columns是stock
+    u_frame = u_frame.astype(float)
     u_frame = u_frame.dropna(axis=1)
-    t = u_frame.index.tolist()[251] # 第t天
-    u_i = Volatility_Adjust(u_frame, t, X_dict[t])
+    # t = u_frame.index.tolist()[len(u_frame)-1] # 第t天
+    u_i = Volatility_Adjusted(u_frame, date, X_dict[date])
     u_i = u_i.sort_index()
     u_i = u_i.squeeze()
     u_i = pd.DataFrame(np.diag(u_i), index = u_frame.columns, columns = u_frame.columns)
     print('-----------------------调整后的特质收益率协方差矩阵-----------------------')
-    print(t)
     print(u_i)
