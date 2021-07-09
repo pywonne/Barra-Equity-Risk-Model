@@ -92,8 +92,9 @@ def CAP_standard(array, floatcap):
     intersectID.sort()
     x = x[intersectID]
     y = y[intersectID]
-    temp = x - (x * y).sum() 
-    std = x.std()
+    average = np.average(x, weights=y)
+    std = np.sqrt(np.average((x-average)**2, weights=y))
+    temp = x - average 
     return temp / std if std !=0 else temp
 
 def Winsorize(x, limit = 3):
