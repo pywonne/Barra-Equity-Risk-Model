@@ -9,7 +9,7 @@ from Idio_cov import Volatility_Adjusted
 from higgsboom.MarketData.CSecurityMarketDataUtils import *
 secUtils = CSecurityMarketDataUtils('Z:/StockData')
 from higgsboom.FuncUtils.DateTime import *
-from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing.dummy import Pool, Lock
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -40,6 +40,7 @@ Volatility_data = pd.DataFrame(pickle.load(Volatility_file))
 u_frame = pd.DataFrame()
 f_frame = pd.DataFrame()
 X_dict = {}
+lock = Lock()
 
 def get_daily_return(t, Index500_Factor):
     '''
@@ -212,8 +213,11 @@ def get_daily_factor_return(t, Index500_StyleFactor):
     f.columns = [t]
     u.columns = [t]
     
+    lock.acquire()
     f_frame = pd.concat([f_frame, f], axis=1)
     u_frame = pd.concat([u_frame, u], axis=1)
+    lock.release()
+
     return f, u 
 
 def daily_calculate(t):
@@ -278,13 +282,14 @@ def get_time_series_return(PeriodList):
     '''
     Multiprocessing
     '''
-    pool = ThreadPool()
-    result = pool.map(daily_calculate, PeriodList)
+    pool = Pool()
+    for i in PeriodList:
+        pool.apply_async(func=daily_calculate, args=(i,))
 
     pool.close()
     pool.join()
-    
     # f_frame.to_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final_2021.xlsx')
+    return
 
 
 # plot风格因子的pure factor return
@@ -318,7 +323,7 @@ if __name__ == "__main__":
     print(vi)
     v_all.append(vi)
     vk = np.array(v_all).mean(axis=0)
-    adj_vk = v_fitting(vk, a=2, n_start_fitting=16)
+    adj_vk = v_fitting(vk, f_frame, a=2, n_start_fitting=16)
     D0, U0 = np.linalg.eigh(F_NW)
     D_hat = np.diag(np.power(adj_vk, 2)).dot(np.diag(D0))
     F_Eigen_Adjusted = pd.DataFrame(U0.dot(D_hat).dot(U0.T))

@@ -18,10 +18,6 @@ import pickle
 
 LNCAP_file = open('C:/Users/panyi/Documents/BarraFactorsLibrary/Barra/CNE5_LNCAP.pkl', 'rb') 
 LNCAP_data = pd.DataFrame(pickle.load(LNCAP_file))
-u = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/u_ret_final.xlsx', header=0, index_col=0)
-u = u.sort_index()
-u = u.T # index是日期，columns是stock
-# print(u)
 
 def var_weighted(self, d=0, tau=90):
     '''

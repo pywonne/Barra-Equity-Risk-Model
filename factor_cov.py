@@ -11,8 +11,7 @@ import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
 
-f = pd.read_excel('C:/Users/panyi/Documents/BarraFactorsLibrary/f_ret_final.xlsx', header=0, index_col=0)
-f = f.T # index是日期，columns是因子名称
+
 
 def var_weighted_NW(F, lambd, delay=2):
     '''
@@ -93,7 +92,7 @@ def Eigen_Adjusted(F_NW, U, std_i, length=252, N_mc=1000):
     v = np.sqrt(v/N_mc)
     return v
 
-def v_fitting(v, a=1.4, n_start_fitting=16):
+def v_fitting(v, f, a=1.4, n_start_fitting=16):
     '''
     Fitting the simulated bias v(k) using a parabola
     v: 需要修正的
@@ -126,7 +125,7 @@ def Volatility_Adjust(self, cov_Eigen, tau=42):
     dia_i = list(range(len(cov_VRA)))
     cov_VRA[dia_i,dia_i] = lambda_F ** 2 * cov_VRA[dia_i,dia_i]
     
-    return pd.DataFrame(cov_VRA, index=f.columns, columns=f.columns)
+    return pd.DataFrame(cov_VRA, index=self.columns, columns=self.columns)
 
 # length = 252
 # n_forward = 21
