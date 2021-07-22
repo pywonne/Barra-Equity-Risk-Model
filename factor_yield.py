@@ -55,10 +55,10 @@ def get_daily_return(t, Index500_Factor):
             Index500_Factor.drop(index=[stock], inplace=True)
             RetFrame.drop(index=[stock], inplace=True)
             continue
-        if(stock_daily_data.at[t, 'TRADE_STATUS'] != '交易'):
-            Index500_Factor.drop(index=[stock], inplace=True)
-            RetFrame.drop(index=[stock], inplace=True)
-            continue        
+        # if(stock_daily_data.at[t, 'TRADE_STATUS'] != '交易'):
+        #     Index500_Factor.drop(index=[stock], inplace=True)
+        #     RetFrame.drop(index=[stock], inplace=True)
+        #     continue        
         today_ret = stock_daily_data.at[t, 'CLOSE']
         yesterday_ret = stock_daily_data.shift(1).at[t, 'CLOSE']
         daily_ret = (today_ret / yesterday_ret) - 1
